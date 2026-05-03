@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Bildabfolgen">
+  <title>Bildabfolgen sortieren – Logopädie</title>
+  <style>
+    :root{
+      --bg:#f6f7f5; --panel:#fff; --green:#55756b; --dark:#26332f; --muted:#63706b;
+      --line:#d9dedb; --wrong:#8a3131; --right:#2f6f4e; --hint:#b8872e;
+      --shadow:0 10px 30px rgba(0,0,0,.09); --radius:22px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--dark);}
+    body{overscroll-behavior:none;}
+    .app{min-height:100%;display:flex;flex-direction:column;padding:18px;gap:14px;}
+    h1{font-size:clamp(24px,3.2vw,38px);line-height:1.05;margin:0;color:var(--green);letter-spacing:-.02em;}
+    .subtitle{font-size:clamp(14px,1.7vw,18px);color:var(--muted);margin-top:5px;}
+    .controls{
+      background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:14px;display:grid;grid-template-columns:1.2fr .8fr .7fr .9fr .6fr auto;gap:10px;align-items:end;
+    }
+    label{display:block;font-weight:700;font-size:14px;color:var(--muted);margin-bottom:6px;}
+    select,button{width:100%;font-size:18px;border-radius:16px;border:1px solid var(--line);padding:13px 14px;background:#fff;color:var(--dark);min-height:52px;}
+    button{font-weight:800;background:var(--green);color:#fff;border:none;cursor:pointer;touch-action:manipulation;}
+    button.secondary{background:#e8eeeb;color:var(--dark);}
+    button.hint{background:#f0e5ce;color:#4b3412;}
+    .main{flex:1;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;min-height:0;}
+    .taskbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;}
+    .tasktitle{font-size:clamp(20px,2.6vw,32px);font-weight:850;}
+    .feedback{font-size:clamp(24px,3vw,40px);font-weight:900;min-width:130px;text-align:right;}
+    .feedback.right{color:var(--right)} .feedback.wrong{color:var(--wrong)} .feedback.hintText{color:var(--hint)}
+    .cards{flex:1;display:grid;gap:12px;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;min-height:0;}
+    .card{
+      background:#fbfcfb;border:3px solid #d8e0dc;border-radius:22px;box-shadow:0 6px 16px rgba(0,0,0,.06);
+      display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-height:0;
+      touch-action:none;user-select:none;position:relative;transition:transform .15s ease, outline .15s ease, opacity .15s ease;
+    }
+    .card.dragging{opacity:.75;transform:scale(1.03);z-index:50;box-shadow:0 14px 34px rgba(0,0,0,.20);}
+    .card.target{outline:6px solid rgba(85,117,107,.35);}
+    .card.solved{outline:7px solid rgba(47,111,78,.5);}
+    .image{flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#ffffff,#edf2ef);min-height:0;padding:10px;}
+    svg{width:100%;height:100%;max-height:260px;}
+    .caption{border-top:1px solid var(--line);padding:10px 12px;text-align:center;font-size:clamp(19px,2.4vw,30px);font-weight:850;line-height:1.08;background:#fff;min-height:54px;display:flex;align-items:center;justify-content:center;}
+    .imageOnly .caption{display:none;}
+    .textOnly .image{display:none;}
+    .textOnly .caption{flex:1;font-size:clamp(28px,3.7vw,48px);min-height:100%;border-top:0;padding:20px;}
+    .buttons{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:12px;}
+    footer{font-size:13px;text-align:center;color:var(--muted);}
+    @media (max-width: 900px){
+      .controls{grid-template-columns:1fr 1fr;align-items:end;}.controls .full{grid-column:1 / -1;}
+      .buttons{grid-template-columns:1fr 1fr;}
+    }
+    @media (orientation: portrait){
+      .cards{grid-template-columns:repeat(2,1fr);}
+      .app{padding:12px;}.controls{gap:8px;padding:10px;}
+      select,button{font-size:16px;min-height:48px;padding:10px;}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Bildabfolgen sortieren</h1><div class="subtitle">Logopädie – Alltagshandlungen in die richtige Reihenfolge bringen</div></header>
+  <section class="controls">
+    <div><label for="situation">Alltagssituation</label><select id="situation"></select></div>
+    <div><label for="target">Zielgruppe</label><select id="target"><option value="kind">Kind</option><option value="adult">Erwachsene</option></select></div>
+    <div><label for="difficulty">Schritte</label><select id="difficulty"><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6" selected>6</option></select></div>
+    <div><label for="mode">Darstellung</label><select id="mode"><option value="both" selected>Bild + Schrift</option><option value="image">nur Bild</option><option value="text">nur Schrift</option></select></div>
+    <div><label for="audio">Vorlesen</label><select id="audio"><option value="off" selected>aus</option><option value="on">ein</option></select></div>
+    <div class="full"><button id="start">Neue Aufgabe</button></div>
+  </section>
+  <main class="main">
+    <div class="taskbar"><div class="tasktitle" id="tasktitle">Bitte Aufgabe starten</div><div class="feedback" id="feedback"></div></div>
+    <div class="cards" id="cards"></div>
+    <div class="buttons">
+      <button id="check">Prüfen</button>
+      <button id="hint" class="hint">Hilfe</button>
+      <button id="solution" class="secondary">Lösung</button>
+      <button id="shuffle" class="secondary">Mischen</button>
+    </div>
+  </main>
+  <footer>Praxis Physio am Turm – Fachbereich Logopädie – 49377 Vechta</footer>
+</div>
+
+<script>
+const situations={
+"Kaffee kochen":["Tasse hinstellen","Wasser einfüllen","Kaffee einsetzen","Maschine einschalten","Kaffee einschenken","Kaffee trinken"],
+"Tee kochen":["Tasse hinstellen","Wasser kochen","Teebeutel einlegen","Wasser eingießen","Tee ziehen lassen","Tee trinken"],
+"Zähne putzen":["Zahnbürste nehmen","Zahnpasta auftragen","Zähne putzen","Mund ausspülen","Zahnbürste reinigen","Zahnbürste wegstellen"],
+"Hände waschen":["Wasser anstellen","Hände nass machen","Seife nehmen","Hände einreiben","Seife abspülen","Hände abtrocknen"],
+"Brot schmieren":["Brot nehmen","Messer nehmen","Butter aufstreichen","Belag auflegen","Brot zusammenklappen","Brot essen"],
+"Jacke anziehen":["Jacke nehmen","Arm hineinstecken","zweiten Arm hineinstecken","Jacke hochziehen","Reißverschluss greifen","Jacke schließen"],
+"Tisch decken":["Tisch frei machen","Teller hinstellen","Besteck hinlegen","Glas hinstellen","Serviette hinlegen","Essen auftragen"],
+"Einkaufen":["Einkaufsliste nehmen","in den Laden gehen","Produkt suchen","Produkt in den Korb legen","bezahlen","nach Hause gehen"],
+"Wäsche waschen":["Wäsche sammeln","Wäsche sortieren","Waschmaschine füllen","Waschmittel einfüllen","Programm starten","Wäsche aufhängen"],
+"Spülmaschine einräumen":["Geschirr abräumen","Reste entfernen","Geschirr einräumen","Reiniger einlegen","Tür schließen","Programm starten"]
+};
+
+let correct=[],current=[],dragId=null;
+const situationEl=document.getElementById('situation');
+Object.keys(situations).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;situationEl.appendChild(o);});
+
+function iconSvg(step,target){
+  const label=step.toLowerCase();let type="generic";
+  if(label.includes("tasse")||label.includes("kaffee")||label.includes("tee"))type="cup";
+  if(label.includes("wasser")||label.includes("mund")||label.includes("abspülen"))type="water";
+  if(label.includes("maschine")||label.includes("programm"))type="machine";
+  if(label.includes("zahn"))type="brush";
+  if(label.includes("seife")||label.includes("hände"))type="soap";
+  if(label.includes("brot")||label.includes("butter")||label.includes("belag"))type="bread";
+  if(label.includes("jacke")||label.includes("arm")||label.includes("reißverschluss"))type="jacket";
+  if(label.includes("tisch")||label.includes("teller")||label.includes("besteck")||label.includes("glas"))type="table";
+  if(label.includes("laden")||label.includes("produkt")||label.includes("bezahlen")||label.includes("einkauf"))type="shop";
+  if(label.includes("wäsche")||label.includes("wasch"))type="wash";
+  if(label.includes("geschirr")||label.includes("spül"))type="dish";
+  const face=target==="kind"?'<circle cx="145" cy="55" r="18" fill="#fff"/><path d="M137 56 q8 8 16 0" stroke="#26332f" stroke-width="4" fill="none" stroke-linecap="round"/>':'';
+  const common=`<svg viewBox="0 0 240 180"><rect x="8" y="8" width="224" height="164" rx="22" fill="#f9fbfa"/>${face}`;
+  const end=`</svg>`;
+  const d={
+    cup:`<path d="M74 68 h75 v52 q0 20-20 20H94q-20 0-20-20z" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M150 83h20q16 0 16 16t-16 16h-20" fill="none" stroke="#26332f" stroke-width="7"/><path d="M93 47 q8-18 0-34 M121 47 q8-18 0-34" stroke="#55756b" stroke-width="6" stroke-linecap="round"/>`,
+    water:`<path d="M120 35 C92 72 78 93 78 116a42 42 0 0 0 84 0c0-23-14-44-42-81z" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M97 121 q22 18 46 0" stroke="#55756b" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+    machine:`<rect x="58" y="42" width="124" height="104" rx="16" fill="#fff" stroke="#26332f" stroke-width="7"/><circle cx="151" cy="70" r="12" fill="#55756b"/><rect x="80" y="82" width="80" height="42" rx="8" fill="#f1f4f2" stroke="#26332f" stroke-width="5"/>`,
+    brush:`<path d="M70 120 L162 48" stroke="#26332f" stroke-width="12" stroke-linecap="round"/><rect x="150" y="35" width="42" height="24" rx="7" fill="#fff" stroke="#26332f" stroke-width="6"/><path d="M55 135 q42 18 86-6" stroke="#55756b" stroke-width="7" fill="none" stroke-linecap="round"/>`,
+    soap:`<rect x="68" y="72" width="104" height="62" rx="24" fill="#fff" stroke="#26332f" stroke-width="7"/><circle cx="91" cy="48" r="13" fill="#fff" stroke="#55756b" stroke-width="5"/><circle cx="128" cy="39" r="18" fill="#fff" stroke="#55756b" stroke-width="5"/>`,
+    bread:`<path d="M70 130V78q0-36 50-36t50 36v52z" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M92 97h56" stroke="#55756b" stroke-width="8" stroke-linecap="round"/>`,
+    jacket:`<path d="M90 50 L62 80 L82 102 L94 90 V145 H146 V90 L158 102 L178 80 L150 50 Z" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M120 55v88" stroke="#55756b" stroke-width="6"/>`,
+    table:`<rect x="52" y="62" width="136" height="28" rx="8" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M72 91v54 M168 91v54" stroke="#26332f" stroke-width="7" stroke-linecap="round"/><circle cx="120" cy="118" r="23" fill="#fff" stroke="#55756b" stroke-width="6"/>`,
+    shop:`<path d="M58 79 h118 l-13 54 H78z" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M73 79 L62 50 H43" stroke="#26332f" stroke-width="7" fill="none" stroke-linecap="round"/><circle cx="89" cy="145" r="10" fill="#55756b"/><circle cx="151" cy="145" r="10" fill="#55756b"/>`,
+    wash:`<rect x="62" y="38" width="116" height="116" rx="14" fill="#fff" stroke="#26332f" stroke-width="7"/><circle cx="120" cy="101" r="34" fill="#f1f4f2" stroke="#55756b" stroke-width="7"/><circle cx="93" cy="60" r="7" fill="#26332f"/>`,
+    dish:`<path d="M64 126 q56 28 112 0" fill="none" stroke="#26332f" stroke-width="8" stroke-linecap="round"/><rect x="74" y="52" width="92" height="72" rx="10" fill="#fff" stroke="#55756b" stroke-width="7"/><path d="M94 68v42 M120 68v42 M146 68v42" stroke="#26332f" stroke-width="5"/>`,
+    generic:`<circle cx="120" cy="84" r="42" fill="#fff" stroke="#26332f" stroke-width="7"/><path d="M92 124h56" stroke="#55756b" stroke-width="7" stroke-linecap="round"/>`
+  };
+  return common+d[type]+end;
+}
+function shuffleArray(a){const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr;}
+function setFeedback(text,cls=""){const f=document.getElementById('feedback');f.textContent=text;f.className='feedback '+cls;speak(text);}
+function start(){
+  const sit=situationEl.value,n=Number(document.getElementById('difficulty').value);
+  correct=situations[sit].slice(0,n).map((text,i)=>({id:`${sit}-${i}`,text,order:i}));
+  current=shuffleArray(correct);
+  document.getElementById('tasktitle').textContent=sit+" – "+n+" Schritte";
+  setFeedback("");
+  render();
+}
+function render(){
+  const mode=document.getElementById('mode').value,target=document.getElementById('target').value;
+  const cards=document.getElementById('cards');cards.innerHTML='';
+  cards.className='cards '+(mode==='image'?'imageOnly':mode==='text'?'textOnly':'');
+  current.forEach(item=>{
+    const c=document.createElement('div');c.className='card';c.dataset.id=item.id;
+    c.innerHTML=`<div class="image">${iconSvg(item.text,target)}</div><div class="caption">${item.text}</div>`;
+    c.addEventListener('pointerdown', pointerStart);
+    cards.appendChild(c);
+  });
+}
+function speak(text){
+  if(!text || document.getElementById('audio').value!=='on')return;
+  if(!('speechSynthesis'in window))return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang='de-DE';u.rate=.85;window.speechSynthesis.speak(u);
+}
+function pointerStart(e){
+  const card=e.currentTarget;
+  dragId=card.dataset.id;
+  card.classList.add('dragging');
+  card.setPointerCapture(e.pointerId);
+  speak(current.find(x=>x.id===dragId)?.text || "");
+  card.addEventListener('pointermove', pointerMove);
+  card.addEventListener('pointerup', pointerEnd, {once:true});
+  card.addEventListener('pointercancel', pointerEnd, {once:true});
+}
+function pointerMove(e){
+  const card=e.currentTarget;
+  card.style.transform=`translate(${e.movementX}px, ${e.movementY}px) scale(1.03)`;
+  const under=document.elementFromPoint(e.clientX,e.clientY)?.closest('.card');
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('target'));
+  if(under && under.dataset.id!==dragId) under.classList.add('target');
+}
+function pointerEnd(e){
+  const card=e.currentTarget;
+  card.classList.remove('dragging');
+  card.style.transform='';
+  card.removeEventListener('pointermove', pointerMove);
+  const under=document.elementFromPoint(e.clientX,e.clientY)?.closest('.card');
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('target'));
+  if(under && under.dataset.id!==dragId) moveTo(dragId, under.dataset.id);
+  dragId=null;
+}
+function moveTo(fromId,toId){
+  const from=current.findIndex(x=>x.id===fromId), to=current.findIndex(x=>x.id===toId);
+  if(from<0||to<0||from===to)return;
+  const [item]=current.splice(from,1);
+  current.splice(to,0,item);
+  setFeedback("");
+  render();
+}
+document.getElementById('start').addEventListener('click',start);
+document.getElementById('shuffle').addEventListener('click',()=>{current=shuffleArray(current);setFeedback("");render();});
+document.getElementById('check').addEventListener('click',()=>{const ok=current.every((x,i)=>x.order===i);setFeedback(ok?'Richtig':'Falsch',ok?'right':'wrong');});
+document.getElementById('hint').addEventListener('click',()=>{
+  const firstWrong=current.findIndex((x,i)=>x.order!==i);
+  if(firstWrong===-1){setFeedback("Richtig","right");return;}
+  const needed=correct[firstWrong];
+  setFeedback("Hilfe","hintText");
+  const el=[...document.querySelectorAll('.card')].find(c=>c.dataset.id===needed.id);
+  if(el){el.classList.add('solved'); setTimeout(()=>el.classList.remove('solved'),1800);}
+  speak("Suche: "+needed.text);
+});
+document.getElementById('solution').addEventListener('click',()=>{current=[...correct];setFeedback("Lösung","hintText");render();document.querySelectorAll('.card').forEach(c=>c.classList.add('solved'));setTimeout(()=>document.querySelectorAll('.card').forEach(c=>c.classList.remove('solved')),1800);});
+document.getElementById('mode').addEventListener('change',render);
+document.getElementById('target').addEventListener('change',render);
+start();
+</script>
+</body>
+</html>
